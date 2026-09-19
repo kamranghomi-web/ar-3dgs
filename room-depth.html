@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room Visualizer + Depth + Shadow</title>
+<style>
+  :root{
+    --bg:#0e0d0b;--panel:#16140f;--line:#2a261d;
+    --ink:#efe7d4;--muted:#9a907a;--accent:#c9a24b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:'Georgia',serif;overflow:hidden}
+  #stage{position:fixed;inset:0;z-index:1}
+  canvas{display:block}
+  #panel{
+    position:fixed;left:18px;top:18px;z-index:10;width:262px;
+    max-height:calc(100vh - 36px);overflow-y:auto;
+    background:rgba(22,20,15,.86);backdrop-filter:blur(8px);
+    border:1px solid var(--line);border-radius:14px;padding:18px;
+  }
+  #panel h1{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:normal;margin-bottom:4px}
+  #panel p.sub{font-size:11px;color:var(--muted);margin-bottom:14px;font-family:system-ui}
+  .row{margin-bottom:12px}
+  .row label{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-family:system-ui}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .file-btn{display:block;width:100%;text-align:center;padding:9px;border:1px dashed var(--line);border-radius:9px;color:var(--ink);font-size:12px;cursor:pointer;font-family:system-ui;transition:.2s}
+  .file-btn:hover{border-color:var(--accent);background:rgba(201,162,75,.07)}
+  input[type=file]{display:none}
+  .val{float:right;color:var(--ink);font-family:system-ui}
+  #status{font-size:11px;color:var(--accent);margin:10px 0;min-height:16px;font-family:system-ui}
+  .divider{height:1px;background:var(--line);margin:14px 0}
+  .chk{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);font-family:system-ui;cursor:pointer;margin-bottom:8px}
+  .chk input{accent-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+
+<div id="panel">
+  <h1>Room Visualizer</h1>
+  <p class="sub">Aks bede · depth + kf + saaye khodkar</p>
+
+  <div class="row">
+    <label class="file-btn" for="file">📷 Entekhab-e aks-e otaagh</label>
+    <input id="file" type="file" accept="image/*">
+  </div>
+  <div id="status">Amaade.</div>
+
+  <div class="divider"></div>
+
+  <div class="row"><label>Andaaze <span class="val" id="vScale">100%</span></label><input id="scale" type="range" min="10" max="300" value="100"></div>
+  <div class="row"><label>Charkhesh <span class="val" id="vRot">0°</span></label><input id="rot" type="range" min="0" max="360" value="0"></div>
+  <div class="row"><label>Chap / Raast <span class="val" id="vX">0</span></label><input id="posx" type="range" min="-100" max="100" value="0"></div>
+  <div class="row"><label>Jolo / Aghab <span class="val" id="vZ">0</span></label><input id="posz" type="range" min="-100" max="100" value="40"></div>
+
+  <div class="divider"></div>
+
+  <div class="row"><label>Ertefaa-ye kf (tanzim) <span class="val" id="vFloor">0</span></label><input id="floorY" type="range" min="-100" max="100" value="0"></div>
+  <div class="row"><label>Omq-e sahne <span class="val" id="vDepth">100</span></label><input id="depthScale" type="range" min="0" max="400" value="100"></div>
+  <div class="row"><label>Sheddat-e saaye <span class="val" id="vShadow">35</span></label><input id="shadowOp" type="range" min="0" max="80" value="35"></div>
+
+  <label class="chk"><input type="checkbox" id="showDepth"> Depth mesh (debug)</label>
+  <label class="chk"><input type="checkbox" id="showFloor"> Kf ro neshoon bede (debug)</label>
+
+  <div class="divider"></div>
+  <p class="sub" style="font-size:10px;line-height:1.5">Model khodkar rooye kf mishine. Age daqiq nabood, "Ertefaa-ye kf" ro tanzim kon. Maus: charkhesh · Scroll: zoom.</p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
+
+const MODEL_URL = 'angel.glb';
+const stage = document.getElementById('stage');
+const statusEl = document.getElementById('status');
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.01, 1000);
+camera.position.set(0, 0, 3.2);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x444433,1.0));
+const dir = new THREE.DirectionalLight(0xffffff,1.6);
+dir.position.set(2,6,3);
+dir.castShadow = true;
+dir.shadow.mapSize.set(1024,1024);
+dir.shadow.camera.near = 0.1;
+dir.shadow.camera.far = 20;
+dir.shadow.camera.left=-3; dir.shadow.camera.right=3;
+dir.shadow.camera.top=3; dir.shadow.camera.bottom=-3;
+dir.shadow.bias = -0.0005;
+scene.add(dir);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0,0,0);
+
+let bgPlane=null, depthMesh=null, shadowPlane=null, floorHelper=null;
+let photoTexture=null, depthTexture=null, photoAspect=1;
+let autoFloorY = -1.0;
+
+let model=null;
+const loader=new GLTFLoader();
+loader.load(MODEL_URL,(gltf)=>{
+  model=gltf.scene;
+  model.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=false; } });
+  const box=new THREE.Box3().setFromObject(model);
+  const size=box.getSize(new THREE.Vector3());
+  const center=box.getCenter(new THREE.Vector3());
+  model.position.sub(center);
+  const maxDim=Math.max(size.x,size.y,size.z);
+  model.userData.base=1.0/maxDim;
+  scene.add(model);
+  applyTransform();
+},undefined,(e)=>{console.error(e);statusEl.textContent='❌ angel.glb load nashod';});
+
+let estimator=null;
+async function getEstimator(){
+  if(estimator) return estimator;
+  statusEl.textContent='⏳ Model-e AI load mishe (bar-e avval)...';
+  let device=('gpu' in navigator)?'webgpu':'wasm';
+  try{ estimator=await pipeline('depth-estimation','onnx-community/depth-anything-v2-small',{device}); }
+  catch(e){ estimator=await pipeline('depth-estimation','onnx-community/depth-anything-v2-small',{device:'wasm'}); }
+  return estimator;
+}
+
+async function processImage(file){
+  const url=URL.createObjectURL(file);
+  photoTexture=await new THREE.TextureLoader().loadAsync(url);
+  photoTexture.colorSpace=THREE.SRGBColorSpace;
+  photoAspect=photoTexture.image.width/photoTexture.image.height;
+
+  const est=await getEstimator();
+  statusEl.textContent='⏳ Depth hesab mishe...';
+  const out=await est(url);
+  const depth=out.depth;
+  const dW=depth.width,dH=depth.height;
+
+  const cnv=document.createElement('canvas');
+  cnv.width=dW;cnv.height=dH;
+  const cctx=cnv.getContext('2d');
+  const imgData=cctx.createImageData(dW,dH);
+  for(let i=0;i<dW*dH;i++){
+    const v=depth.data[i];
+    imgData.data[i*4+0]=v;imgData.data[i*4+1]=v;imgData.data[i*4+2]=v;imgData.data[i*4+3]=255;
+  }
+  cctx.putImageData(imgData,0,0);
+  depthTexture=new THREE.CanvasTexture(cnv);
+  depthTexture.needsUpdate=true;
+
+  let sum=0,count=0;
+  const startRow=Math.floor(dH*0.85);
+  for(let y=startRow;y<dH;y++) for(let x=0;x<dW;x++){ sum+=depth.data[y*dW+x]; count++; }
+  const avgBottom=sum/count;
+  autoFloorY = -1.2 + (avgBottom/255)*0.6;
+
+  buildScene();
+  statusEl.textContent='✅ Amaade. Age lazem bood "Ertefaa-ye kf" ro tanzim kon.';
+}
+
+function buildScene(){
+  [bgPlane,depthMesh,shadowPlane,floorHelper].forEach(m=>{if(m)scene.remove(m);});
+
+  const planeW=4*(photoAspect>=1?1:photoAspect);
+  const planeH=planeW/photoAspect;
+
+  const bgGeo=new THREE.PlaneGeometry(planeW,planeH);
+  const bgMat=new THREE.MeshBasicMaterial({map:photoTexture,depthWrite:false});
+  bgPlane=new THREE.Mesh(bgGeo,bgMat);
+  bgPlane.position.z=-2.0;bgPlane.renderOrder=-1;
+  scene.add(bgPlane);
+
+  const segW=256,segH=Math.round(256/photoAspect);
+  const dGeo=new THREE.PlaneGeometry(planeW,planeH,segW,segH);
+  const occMat=new THREE.MeshStandardMaterial({
+    colorWrite:false,depthWrite:true,
+    displacementMap:depthTexture,displacementScale:1.0,displacementBias:0.0
+  });
+  depthMesh=new THREE.Mesh(dGeo,occMat);
+  depthMesh.position.z=-2.0;
+  scene.add(depthMesh);
+
+  const shGeo=new THREE.PlaneGeometry(8,8);
+  const shMat=new THREE.ShadowMaterial({opacity:0.35});
+  shadowPlane=new THREE.Mesh(shGeo,shMat);
+  shadowPlane.rotation.x=-Math.PI/2;
+  shadowPlane.receiveShadow=true;
+  scene.add(shadowPlane);
+
+  const fGeo=new THREE.PlaneGeometry(8,8);
+  const fMat=new THREE.MeshBasicMaterial({color:0x44aa88,transparent:true,opacity:0.25,side:THREE.DoubleSide});
+  floorHelper=new THREE.Mesh(fGeo,fMat);
+  floorHelper.rotation.x=-Math.PI/2;
+  floorHelper.visible=false;
+  scene.add(floorHelper);
+
+  updateDepthScale();updateDepthVisible();updateShadow();updateFloorVisible();
+  applyTransform();
+}
+
+const ui={
+  scale:e('scale'),rot:e('rot'),posx:e('posx'),posz:e('posz'),
+  floorY:e('floorY'),depthScale:e('depthScale'),shadowOp:e('shadowOp'),
+  showDepth:e('showDepth'),showFloor:e('showFloor')
+};
+function e(id){return document.getElementById(id);}
+
+function currentFloorY(){ return autoFloorY + (+ui.floorY.value/100); }
+
+function applyTransform(){
+  if(!model) return;
+  const sc=(+ui.scale.value/100)*model.userData.base;
+  model.scale.setScalar(sc);
+  model.rotation.y=THREE.MathUtils.degToRad(+ui.rot.value);
+  model.position.x=+ui.posx.value/40;
+  model.position.z=-2.0+(+ui.posz.value/40);
+  const fy=currentFloorY();
+
+  model.position.y=0;
+  model.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(model);
+  model.position.y = fy - box.min.y;
+
+  if(shadowPlane) shadowPlane.position.y=fy;
+  if(floorHelper) floorHelper.position.y=fy;
+  e('vScale').textContent=ui.scale.value+'%';
+  e('vRot').textContent=ui.rot.value+'°';
+  e('vX').textContent=ui.posx.value;
+  e('vZ').textContent=ui.posz.value;
+  e('vFloor').textContent=ui.floorY.value;
+}
+function updateDepthScale(){
+  if(depthMesh){depthMesh.material.displacementScale=+ui.depthScale.value/100;depthMesh.material.needsUpdate=true;}
+  e('vDepth').textContent=ui.depthScale.value;
+}
+function updateDepthVisible(){
+  if(depthMesh){
+    depthMesh.material.colorWrite=ui.showDepth.checked;
+    if(ui.showDepth.checked){depthMesh.material.map=depthTexture;depthMesh.material.color=new THREE.Color(0xffffff);}
+    depthMesh.material.needsUpdate=true;
+  }
+}
+function updateShadow(){
+  if(shadowPlane){shadowPlane.material.opacity=+ui.shadowOp.value/100;}
+  e('vShadow').textContent=ui.shadowOp.value;
+}
+function updateFloorVisible(){ if(floorHelper) floorHelper.visible=ui.showFloor.checked; }
+
+['scale','rot','posx','posz','floorY'].forEach(k=>ui[k].addEventListener('input',applyTransform));
+ui.depthScale.addEventListener('input',updateDepthScale);
+ui.shadowOp.addEventListener('input',updateShadow);
+ui.showDepth.addEventListener('change',updateDepthVisible);
+ui.showFloor.addEventListener('change',updateFloorVisible);
+
+document.getElementById('file').addEventListener('change',async(ev)=>{
+  const f=ev.target.files[0];if(!f)return;
+  try{await processImage(f);}catch(err){console.error(err);statusEl.textContent='❌ Khata: '+err.message;}
+});
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+(function tick(){controls.update();renderer.render(scene,camera);requestAnimationFrame(tick);})();
+</script>
+</body>
+</html>
