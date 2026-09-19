@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NOMOUD AR · 3DGS Angel</title>
+  <title>NOMOUD AR · 3DGS</title>
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
   <style>
     body{margin:0;background:#0e0d0b;font-family:system-ui,sans-serif;color:#efe7d4}
@@ -35,19 +35,17 @@
 </head>
 <body>
 
+<!-- Choose a model with ?m=NAME, e.g. index.html?m=angel-2 . Default: angel -->
 <model-viewer
   id="mv"
-  src="angel.glb"
-  ios-src="angel.usdz"
   ar
   ar-modes="webxr scene-viewer quick-look"
   ar-scale="auto"
   ar-placement="floor"
   camera-controls
   touch-action="pan-y"
-  shadow-intensity="1"
-  alt="Angel with candlestick – 3D model">
-  <div class="label">Angel · 3DGS</div>
+  shadow-intensity="1">
+  <div class="label" id="label">3DGS</div>
   <button slot="ar-button" class="ar-btn" title="مشاهده در AR">
     <svg viewBox="0 0 24 24">
       <path d="M12 2l8 4.5v9L12 20 4 15.5v-9L12 2z"/>
@@ -58,7 +56,19 @@
 </model-viewer>
 
 <script>
+  const MODELS = {
+    'angel':   { label: 'Angel · 3DGS',   alt: 'Angel with candlestick – 3D model' },
+    'angel-2': { label: 'Angel II · 3DGS', alt: 'Kneeling angel with crossed arms – 3D model' }
+  };
+  const params = new URLSearchParams(location.search);
+  const key = MODELS[params.get('m')] ? params.get('m') : 'angel';
   const mv = document.getElementById('mv');
+  mv.src = key + '.glb';
+  mv.iosSrc = key + '.usdz';
+  mv.alt = MODELS[key].alt;
+  document.getElementById('label').textContent = MODELS[key].label;
+  document.title = 'NOMOUD AR · ' + MODELS[key].label;
+
   const bar = document.getElementById('bar');
   const progress = document.getElementById('progress');
   mv.addEventListener('progress', (e) => {
