@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fa">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -41,12 +41,12 @@
     .qr.show{display:block}
     .qr .code{background:#fff;border-radius:8px;padding:6px;line-height:0}
     .qr .code svg{width:100%;height:auto;display:block}
-    .qr .cap{font-size:11px;line-height:1.5;color:#efe7d4;margin-top:8px;direction:rtl}
+    .qr .cap{font-size:11px;line-height:1.5;color:#efe7d4;margin-top:8px}
 
     /* big "open AR" button (phones only) */
     .open-ar{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);z-index:20;display:none;
       background:#c9a24b;color:#16140f;border:0;border-radius:999px;
-      padding:14px 26px;font:600 15px system-ui,sans-serif;direction:rtl;
+      padding:14px 26px;font:600 15px system-ui,sans-serif;
       box-shadow:0 6px 24px rgba(0,0,0,.4);cursor:pointer}
     .open-ar.show{display:block}
   </style>
@@ -64,7 +64,7 @@
   touch-action="pan-y"
   shadow-intensity="1">
   <div class="label" id="label">3DGS</div>
-  <button slot="ar-button" class="ar-btn" title="مشاهده در AR">
+  <button slot="ar-button" class="ar-btn" title="View in AR">
     <svg viewBox="0 0 24 24">
       <path d="M12 2l8 4.5v9L12 20 4 15.5v-9L12 2z"/>
       <path d="M12 2v9M12 11l8-4.5M12 11L4 6.5"/>
@@ -75,10 +75,10 @@
 
 <div class="qr" id="qr">
   <div class="code" id="qrCode"></div>
-  <div class="cap">با دوربین گوشی اسکن کنید تا AR باز شود</div>
+  <div class="cap">Scan with your phone camera to view in AR</div>
 </div>
 
-<button class="open-ar" id="openAr">مشاهده در AR</button>
+<button class="open-ar" id="openAr">View in AR</button>
 
 <script>
   const MODELS = {
