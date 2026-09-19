@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NOMOUD AR · 3DGS Angel</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+  <style>
+    body{margin:0;background:#0e0d0b;font-family:system-ui,sans-serif;color:#efe7d4}
+    model-viewer{width:100vw;height:100vh;--poster-color:#0e0d0b}
+    .ar-btn{
+      position:absolute;top:18px;right:18px;
+      width:46px;height:46px;
+      background:rgba(22,20,15,.7);backdrop-filter:blur(8px);
+      border:1px solid rgba(201,162,75,.5);border-radius:12px;
+      cursor:pointer;z-index:10;
+      display:flex;align-items:center;justify-content:center;
+      transition:border-color .2s,background .2s;
+    }
+    .ar-btn:hover{border-color:#c9a24b;background:rgba(201,162,75,.15)}
+    .ar-btn svg{width:24px;height:24px;stroke:#c9a24b;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+    /* loading bar */
+    .progress{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);
+      width:180px;height:3px;background:rgba(201,162,75,.2);border-radius:3px;overflow:hidden}
+    .progress .bar{height:100%;width:0;background:#c9a24b;transition:width .2s}
+    .progress.hide{opacity:0;transition:opacity .4s}
+
+    /* label */
+    .label{position:absolute;left:18px;top:18px;z-index:10;
+      font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#c9a24b;
+      background:rgba(22,20,15,.7);backdrop-filter:blur(8px);
+      border:1px solid rgba(201,162,75,.3);border-radius:10px;padding:9px 12px}
+  </style>
+</head>
+<body>
+
+<model-viewer
+  id="mv"
+  src="angel.glb"
+  ios-src="angel.usdz"
+  ar
+  ar-modes="webxr scene-viewer quick-look"
+  ar-scale="auto"
+  ar-placement="floor"
+  camera-controls
+  touch-action="pan-y"
+  shadow-intensity="1"
+  alt="Angel with candlestick – 3D model">
+  <div class="label">Angel · 3DGS</div>
+  <button slot="ar-button" class="ar-btn" title="مشاهده در AR">
+    <svg viewBox="0 0 24 24">
+      <path d="M12 2l8 4.5v9L12 20 4 15.5v-9L12 2z"/>
+      <path d="M12 2v9M12 11l8-4.5M12 11L4 6.5"/>
+    </svg>
+  </button>
+  <div class="progress" slot="progress-bar" id="progress"><div class="bar" id="bar"></div></div>
+</model-viewer>
+
+<script>
+  const mv = document.getElementById('mv');
+  const bar = document.getElementById('bar');
+  const progress = document.getElementById('progress');
+  mv.addEventListener('progress', (e) => {
+    const p = e.detail.totalProgress;
+    bar.style.width = (p * 100) + '%';
+    if (p >= 1) progress.classList.add('hide');
+  });
+</script>
+
+</body>
+</html>
